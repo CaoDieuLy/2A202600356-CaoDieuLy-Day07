@@ -9,7 +9,7 @@ EMBEDDING_PROVIDER_ENV = "EMBEDDING_PROVIDER"
 
 
 class MockEmbedder:
-    """Deterministic embedding backend used by tests and default classroom runs."""
+    """Backend embedding xác định dùng cho kiểm thử và chạy mặc định trong lớp học."""
 
     def __init__(self, dim: int = 64) -> None:
         self.dim = dim
@@ -27,7 +27,7 @@ class MockEmbedder:
 
 
 class LocalEmbedder:
-    """Sentence Transformers-backed local embedder."""
+    """Embedder local sử dụng Sentence Transformers."""
 
     def __init__(self, model_name: str = LOCAL_EMBEDDING_MODEL) -> None:
         from sentence_transformers import SentenceTransformer

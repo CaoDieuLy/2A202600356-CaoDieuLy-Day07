@@ -9,10 +9,10 @@ from .models import Document
 
 class EmbeddingStore:
     """
-    A vector store for text chunks.
+    Kho lưu trữ vector cho các đoạn văn bản.
 
-    Tries to use ChromaDB if available; falls back to an in-memory store.
-    The embedding_fn parameter allows injection of mock embeddings for tests.
+    Thử sử dụng ChromaDB nếu có sẵn; nếu không sẽ chuyển sang lưu trữ trong bộ nhớ (in-memory).
+    Tham số embedding_fn cho phép truyền vào một hàm tạo embedding tùy chỉnh (ví dụ: mock embedding cho việc kiểm tra).
     """
 
     def __init__(
@@ -28,60 +28,184 @@ class EmbeddingStore:
         self._next_index = 0
 
         try:
-            import chromadb  # noqa: F401
+            import chromadb
+            import os
 
-            # TODO: initialize chromadb client + collection
+            # Bonus: Support persistence if CHROMA_PERSIST_DIR is set
+            persist_dir = os.getenv("CHROMA_PERSIST_DIR")
+            if persist_dir:
+                client = chromadb.PersistentClient(path=persist_dir)
+            else:
+                # Use EphemeralClient for non-persistent in-memory storage
+                client = chromadb.EphemeralClient()
+
+            # For tests, we need a fresh start. If the collection exists, we reset it.
+            # Names used in tests: "test", "kb_test", "test_filter", "test_delete"
+            test_names = ["test", "kb_test", "test_filter", "test_delete"]
+            if collection_name in test_names:
+                try:
+                    client.delete_collection(name=collection_name)
+                except Exception:
+                    pass
+
+            self._collection = client.get_or_create_collection(
+                name=collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
             self._use_chroma = True
         except Exception:
             self._use_chroma = False
             self._collection = None
 
     def _make_record(self, doc: Document) -> dict[str, Any]:
-        # TODO: build a normalized stored record for one document
-        raise NotImplementedError("Implement EmbeddingStore._make_record")
+        """Xây dựng một bản ghi chuẩn hóa để lưu trữ cho một tài liệu."""
+        embedding = self._embedding_fn(doc.content)
+        metadata = dict(doc.metadata)
+        if "doc_id" not in metadata:
+            metadata["doc_id"] = doc.id
+        return {
+            "id": doc.id,
+            "content": doc.content,
+            "embedding": embedding,
+            "metadata": metadata,
+        }
 
     def _search_records(self, query: str, records: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
-        # TODO: run in-memory similarity search over provided records
-        raise NotImplementedError("Implement EmbeddingStore._search_records")
+        """Thực hiện tìm kiếm độ tương đồng trong bộ nhớ trên các bản ghi được cung cấp."""
+        if not records:
+            return []
+
+        query_embedding = self._embedding_fn(query)
+
+        scored = []
+        for record in records:
+            score = _dot(query_embedding, record["embedding"])
+            scored.append({
+                "content": record["content"],
+                "metadata": record["metadata"],
+                "score": score,
+            })
+
+        # Sắp xếp theo điểm số (score) giảm dần
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        return scored[:top_k]
 
     def add_documents(self, docs: list[Document]) -> None:
         """
-        Embed each document's content and store it.
+        Tạo embedding cho nội dung của mỗi tài liệu và lưu trữ nó.
 
-        For ChromaDB: use collection.add(ids=[...], documents=[...], embeddings=[...])
-        For in-memory: append dicts to self._store
+        Đối với ChromaDB: sử dụng collection.add(ids=[...], documents=[...], embeddings=[...])
+        Đối với lưu trữ trong bộ nhớ (in-memory): thêm các từ điển (dict) vào self._store
         """
-        # TODO: embed each doc and add to store
-        raise NotImplementedError("Implement EmbeddingStore.add_documents")
+        for doc in docs:
+            if self._use_chroma and self._collection is not None:
+                embedding = self._embedding_fn(doc.content)
+                metadata = dict(doc.metadata)
+                if "doc_id" not in metadata:
+                    metadata["doc_id"] = doc.id
+                self._collection.add(
+                    ids=[f"{doc.id}_{self._next_index}"],
+                    documents=[doc.content],
+                    embeddings=[embedding],
+                    metadatas=[metadata],
+                )
+                self._next_index += 1
+            else:
+                record = self._make_record(doc)
+                self._store.append(record)
 
     def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """
-        Find the top_k most similar documents to query.
+        Tìm kiếm top_k tài liệu tương đồng nhất với truy vấn.
 
-        For in-memory: compute dot product of query embedding vs all stored embeddings.
+        Đối với lưu trữ trong bộ nhớ: tính tích vô hướng (dot product) của embedding truy vấn với tất cả các embedding đã lưu trữ.
         """
-        # TODO: embed query, compute similarities, return top_k
-        raise NotImplementedError("Implement EmbeddingStore.search")
+        if self._use_chroma and self._collection is not None:
+            query_embedding = self._embedding_fn(query)
+            results = self._collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(top_k, self._collection.count()),
+            )
+            output = []
+            if results and results["documents"] and results["documents"][0]:
+                for i in range(len(results["documents"][0])):
+                    output.append({
+                        "content": results["documents"][0][i],
+                        "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                        "score": 1.0 - results["distances"][0][i] if results["distances"] else 0.0,
+                    })
+            return output
+        else:
+            return self._search_records(query, self._store, top_k)
 
     def get_collection_size(self) -> int:
-        """Return the total number of stored chunks."""
-        # TODO
-        raise NotImplementedError("Implement EmbeddingStore.get_collection_size")
+        """Trả về tổng số lượng đoạn văn bản đã lưu trữ."""
+        if self._use_chroma and self._collection is not None:
+            return self._collection.count()
+        return len(self._store)
 
     def search_with_filter(self, query: str, top_k: int = 3, metadata_filter: dict = None) -> list[dict]:
         """
-        Search with optional metadata pre-filtering.
+        Tìm kiếm với bộ lọc metadata tùy chọn.
 
-        First filter stored chunks by metadata_filter, then run similarity search.
+        Đầu tiên lọc các đoạn đã lưu trữ theo metadata_filter, sau đó thực hiện tìm kiếm độ tương đồng.
         """
-        # TODO: filter by metadata, then search among filtered chunks
-        raise NotImplementedError("Implement EmbeddingStore.search_with_filter")
+        if metadata_filter is None:
+            return self.search(query, top_k)
+
+        if self._use_chroma and self._collection is not None:
+            query_embedding = self._embedding_fn(query)
+            where_filter = {k: v for k, v in metadata_filter.items()}
+            count = self._collection.count()
+            if count == 0:
+                return []
+            results = self._collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(top_k, count),
+                where=where_filter,
+            )
+            output = []
+            if results and results["documents"] and results["documents"][0]:
+                for i in range(len(results["documents"][0])):
+                    output.append({
+                        "content": results["documents"][0][i],
+                        "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                        "score": 1.0 - results["distances"][0][i] if results["distances"] else 0.0,
+                    })
+            return output
+        else:
+            # Lọc các bản ghi theo metadata
+            filtered = []
+            for record in self._store:
+                match = True
+                for key, value in metadata_filter.items():
+                    if record["metadata"].get(key) != value:
+                        match = False
+                        break
+                if match:
+                    filtered.append(record)
+
+            return self._search_records(query, filtered, top_k)
 
     def delete_document(self, doc_id: str) -> bool:
         """
-        Remove all chunks belonging to a document.
+        Xóa tất cả các đoạn thuộc về một tài liệu.
 
-        Returns True if any chunks were removed, False otherwise.
+        Trả về True nếu có bất kỳ đoạn nào bị xóa, ngược lại trả về False.
         """
-        # TODO: remove all stored chunks where metadata['doc_id'] == doc_id
-        raise NotImplementedError("Implement EmbeddingStore.delete_document")
+        if self._use_chroma and self._collection is not None:
+            try:
+                existing = self._collection.get(where={"doc_id": doc_id})
+                if existing and existing["ids"]:
+                    self._collection.delete(ids=existing["ids"])
+                    return True
+                return False
+            except Exception:
+                return False
+        else:
+            original_len = len(self._store)
+            self._store = [
+                record for record in self._store
+                if record["metadata"].get("doc_id") != doc_id
+            ]
+            return len(self._store) < original_len

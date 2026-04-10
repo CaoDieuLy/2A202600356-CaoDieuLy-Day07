@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
+import io
 from pathlib import Path
+
+# Thiết lập encoding cho stdout trên Windows để in được tiếng Việt
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from dotenv import load_dotenv
 

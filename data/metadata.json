@@ -1,0 +1,58 @@
+{
+  "01_cay_khe.txt": {
+    "title": "Truyện Cây Khế",
+    "main_character": "Người em",
+    "theme": "Lòng tham",
+    "moral_lesson": "Ở hiền gặp lành",
+    "category": "Folk Tale"
+  },
+  "02_so_dua.txt": {
+    "title": "Truyện Sọ Dừa",
+    "main_character": "Sọ Dừa",
+    "theme": "Nhân hậu",
+    "moral_lesson": "Xem trọng phẩm chất bên trong",
+    "category": "Folk Tale"
+  },
+  "03_tam_cam.txt": {
+    "title": "Truyện Tấm Cám",
+    "main_character": "Cô Tấm",
+    "theme": "Thiện thắng Ác",
+    "moral_lesson": "Người hiền gặp lành",
+    "category": "Folk Tale"
+  },
+  "04_thach_sanh_ly_thong.txt": {
+    "title": "Thạch Sanh",
+    "main_character": "Thạch Sanh",
+    "theme": "Dũng cảm",
+    "moral_lesson": "Công lý và sự chính trực",
+    "category": "Folk Tale"
+  },
+  "05_thanh_giong.txt": {
+    "title": "Thánh Gióng",
+    "main_character": "Thánh Gióng",
+    "theme": "Anh hùng",
+    "moral_lesson": "Lòng yêu quốc và bảo vệ tổ quốc",
+    "category": "Folk Tale"
+  },
+  "06_cay_tre_tram_dot.txt": {
+    "title": "Cây tre trăm đốt",
+    "main_character": "Khoai",
+    "theme": "Công lý",
+    "moral_lesson": "Lên án sự gian tham, lừa lọc",
+    "category": "Folk Tale"
+  },
+  "07_su_tich_trau_cau.txt": {
+    "title": "Sự tích trầu cau",
+    "main_character": "Anh em họ Cao",
+    "theme": "Tình thân",
+    "moral_lesson": "Tình nghĩa anh em, vợ chồng keo sơn",
+    "category": "Folk Tale"
+  },
+  "08_em_be_thong_minh.txt": {
+    "title": "Em bé thông minh",
+    "main_character": "Em bé",
+    "theme": "Trí tuệ",
+    "moral_lesson": "Khẳng định tài năng, trí tuệ dân gian",
+    "category": "Folk Tale"
+  }
+}
